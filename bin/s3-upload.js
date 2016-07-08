@@ -1,37 +1,8 @@
 'use strict';
 
-require('dotenv').config();
+let uploader = require('../lib/aws-s3-upload');
 
 const fs = require('fs');
-const crypto = require('crypto');
-
-const fileType = require('file-type');
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3({
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
-
-const mimeType = (data) => {
-  return Object.assign({
-    ext: 'bin',
-    mime: 'application/octet-stream'
-  },fileType(data));
-};
-
-const randomHexString = (length) => {
-  return new Promise((resolve, reject) => {
-    crypto.randomBytes(length, (error, buffer) => {
-      if(error) {
-        reject(error);
-      }
-
-      resolve(buffer.toString('hex'));
-    });
-  });
-};
 
 let filename = process.argv[2] || '';
 
@@ -47,37 +18,8 @@ const readFile = (filename) => {
   });
 };
 
-const awsUpload = (file) => {
-  return randomHexString(16)
-  .then((filename) => {
-    let dir = new Date().toISOString().split('T')[0];
-    return {
-    ACL: 'public-read',
-    Body: file.data,
-    Bucket: 'sarahhartwick',
-    ContentType: file.mime,
-    Key: `${dir}/${filename}.${file.ext}`,
-  };
-})
- .then((options) => {
-  return new Promise ((resolve, reject) => {
-    s3.upload(options, (err, data) => {
-      if(err) {
-        reject(err);
-      }
-
-      resolve(data);
-  });
- });
- });
-};
-
 readFile(filename)
-.then((data) => {
-  let file = mimeType(data);
-  file.data = data;
-  return file;
-})
-.then(awsUpload)
+.then(uploader.prepareFile)
+.then(uploader.awsUpload)
 .then(console.log)
 .catch(console.error);
